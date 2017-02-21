@@ -22,11 +22,13 @@ SCAN_INTERVAL = 300  # seconds
 SERVICE_NETGEAR = 'netgear_router'
 SERVICE_WEMO = 'belkin_wemo'
 SERVICE_HASS_IOS_APP = 'hass_ios'
+SERVICE_AUTOHUB = 'autohub'
 
 SERVICE_HANDLERS = {
     SERVICE_HASS_IOS_APP: ('ios', None),
     SERVICE_NETGEAR: ('device_tracker', None),
     SERVICE_WEMO: ('wemo', None),
+    SERVICE_AUTOHUB: ('autohub', None),
     'philips_hue': ('light', 'hue'),
     'google_cast': ('media_player', 'cast'),
     'panasonic_viera': ('media_player', 'panasonic_viera'),
