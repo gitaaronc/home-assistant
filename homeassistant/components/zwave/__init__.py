@@ -43,13 +43,15 @@ CONF_DEVICE_CONFIG = 'device_config'
 CONF_DEVICE_CONFIG_GLOB = 'device_config_glob'
 CONF_DEVICE_CONFIG_DOMAIN = 'device_config_domain'
 
+ATTR_POWER = 'power_consumption'
+
 DEFAULT_CONF_AUTOHEAL = True
 DEFAULT_CONF_USB_STICK_PATH = '/zwaveusbstick'
 DEFAULT_POLLING_INTERVAL = 60000
 DEFAULT_DEBUG = False
 DEFAULT_CONF_IGNORED = False
 DEFAULT_CONF_REFRESH_VALUE = False
-DEFAULT_CONF_REFRESH_DELAY = 2
+DEFAULT_CONF_REFRESH_DELAY = 5
 DOMAIN = 'zwave'
 
 NETWORK = None
@@ -259,22 +261,6 @@ def get_config_value(node, value_index, tries=5):
         # we was looking for a value, just do it again
         return None if tries <= 0 else get_config_value(
             node, value_index, tries=tries - 1)
-    return None
-
-
-def _get_wakeup(node, tries=5):
-    """Return wakeup interval of the node or None if node is not wakable."""
-    try:
-        if node.can_wake_up():
-            for value_id in node.get_values(
-                    class_id=const.COMMAND_CLASS_WAKE_UP):
-                return node.values[value_id].data
-    except RuntimeError:
-        # If we get an runtime error the dict has changed while
-        # we was looking for a value, just do it again
-        return None if tries <= 0 else _get_wakeup(
-            node, tries=tries - 1)
-
     return None
 
 
@@ -692,6 +678,7 @@ class ZWaveDeviceEntity(Entity):
         from pydispatch import dispatcher
         self._value = value
         self.entity_id = "{}.{}".format(domain, self._object_id())
+        self._update_attributes()
 
         dispatcher.connect(
             self.network_value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
@@ -705,22 +692,48 @@ class ZWaveDeviceEntity(Entity):
 
     def value_changed(self, value):
         """Called when a value for this entity's node has changed."""
+        self._update_attributes()
         self.update_properties()
         self.schedule_update_ha_state()
 
+    def _update_attributes(self):
+        """Update the node attributes. May only be used inside callback."""
+        self.node_id = self._value.node.node_id
+        self.location = self._value.node.location
+        self.battery_level = self._value.node.get_battery_level()
+        self.wakeup_interval = None
+        if self._value.node.can_wake_up():
+            self.wakeup_interval = self.get_value(
+                class_id=const.COMMAND_CLASS_WAKE_UP,
+                member='data')
+        power_value = self.get_value(
+            class_id=[const.COMMAND_CLASS_SENSOR_MULTILEVEL,
+                      const.COMMAND_CLASS_METER],
+            label=['Power'])
+        self.power_consumption = round(
+            power_value.data, power_value.precision) if power_value else None
+
     def _value_handler(self, method=None, class_id=None, index=None,
                        label=None, data=None, member=None, **kwargs):
-        """Get the values for a given command_class with arguments."""
-        if class_id is not None:
-            kwargs[CLASS_ID] = class_id
+        """Get the values for a given command_class with arguments.
+
+        May only be used inside callback.
+
+        """
+        values = []
+        if class_id is None:
+            values.extend(self._value.node.get_values(**kwargs).values())
+        else:
+            if not isinstance(class_id, list):
+                class_id = [class_id]
+            for cid in class_id:
+                values.extend(self._value.node.get_values(
+                    class_id=cid, **kwargs).values())
         _LOGGER.debug('method=%s, class_id=%s, index=%s, label=%s, data=%s,'
                       ' member=%s, kwargs=%s',
                       method, class_id, index, label, data, member, kwargs)
-        values = self._value.node.get_values(**kwargs).values()
         _LOGGER.debug('values=%s', values)
         results = None
-        if not values:
-            return None
         for value in values:
             if index is not None and value.index != index:
                 continue
@@ -746,7 +759,7 @@ class ZWaveDeviceEntity(Entity):
         return results
 
     def get_value(self, **kwargs):
-        """Simplifyer to get values."""
+        """Simplifyer to get values. May only be used inside callback."""
         return self._value_handler(method='get', **kwargs)
 
     def set_value(self, **kwargs):
@@ -785,26 +798,19 @@ class ZWaveDeviceEntity(Entity):
     def device_state_attributes(self):
         """Return the device specific state attributes."""
         attrs = {
-            const.ATTR_NODE_ID: self._value.node.node_id,
+            const.ATTR_NODE_ID: self.node_id,
         }
 
-        try:
-            battery_level = self._value.node.get_battery_level()
-        except RuntimeError:
-            # If we get an runtime error the dict has changed while
-            # we was looking for a value, just do it again
-            battery_level = self._value.node.get_battery_level()
+        if self.battery_level is not None:
+            attrs[ATTR_BATTERY_LEVEL] = self.battery_level
 
-        if battery_level is not None:
-            attrs[ATTR_BATTERY_LEVEL] = battery_level
+        if self.location:
+            attrs[ATTR_LOCATION] = self.location
 
-        location = self._value.node.location
+        if self.wakeup_interval is not None:
+            attrs[ATTR_WAKEUP] = self.wakeup_interval
 
-        if location:
-            attrs[ATTR_LOCATION] = location
-
-        wakeup = _get_wakeup(self._value.node)
-        if wakeup:
-            attrs[ATTR_WAKEUP] = wakeup
+        if self.power_consumption is not None:
+            attrs[ATTR_POWER] = self.power_consumption
 
         return attrs
