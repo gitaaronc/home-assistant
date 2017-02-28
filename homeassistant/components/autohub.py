@@ -40,14 +40,7 @@ AUTOHUB_SERVICE_DISPATCH = {
 AUTOHUBWS = None
 
 def setup(hass, config):
-    """Setup Autohub Hub component.
-    This will automatically import associated lights.
-    if not validate_config(
-            config,
-            {DOMAIN: [CONF_USERNAME, CONF_PASSWORD, CONF_API_KEY]},
-            _LOGGER):
-        return False
-    """
+    """Setup our connectoin to autohubpp"""
     import pyautohub
 	
     conf = config[DOMAIN]
@@ -87,6 +80,7 @@ def setup(hass, config):
         discovery.discover(hass, service, device, component, config)
 
     autohub_object = pyautohub.AutohubWS(host, port, _LOGGER)
+    hass.data['autohub_object'] = autohub_object
 
     # register callback handler with pyautohub
     autohub_object.on_device_added(OnDeviceAdded)
@@ -96,7 +90,5 @@ def setup(hass, config):
     discovery.listen(hass, SERVICE_AUTOHUB, discovery_dispatch)
 	
     autohub_object.start()
-    hass.data['autohub_object'] = autohub_object
-
 
     return True

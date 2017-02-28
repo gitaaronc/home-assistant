@@ -8,6 +8,7 @@ import logging
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS, SUPPORT_BRIGHTNESS, Light)
+from homeassistant.loader import get_component
 
 _LOGGER = logging.getLogger(__name__)
 
