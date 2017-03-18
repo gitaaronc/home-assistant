@@ -83,7 +83,7 @@ class AutohubDimmingDevice(Light):
 
     def turn_on(self, **kwargs):
         """Turn device on."""
-        level = self.node._properties_.get("button_on_level", 255)
+        level = 255
 
         if ATTR_BRIGHTNESS in kwargs:
             level = kwargs[ATTR_BRIGHTNESS]
