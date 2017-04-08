@@ -47,7 +47,7 @@ class AutohubDimmingDevice(Light):
         if not hasattr(self, 'hass'):
             self.update()
             return
-        self.update_ha_state(True)
+        self.schedule_update_ha_state(True)
 
     @property
     def unique_id(self):
@@ -91,14 +91,14 @@ class AutohubDimmingDevice(Light):
         self._value = level
         self.node._properties_["light_status"] = self._value
         self.node.send_command('on', level)
-        self.update_ha_state()
+        self.schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn device off."""
         self._value = 0
         self.node._properties_["light_status"] = self._value
         self.node.send_command('off')
-        self.update_ha_state()
+        self.schedule_update_ha_state()
 
     def update(self):
         """Update state of the sensor."""
